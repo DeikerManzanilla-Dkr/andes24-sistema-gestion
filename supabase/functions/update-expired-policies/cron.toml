@@ -1,0 +1,2 @@
+[named_cron_jobs]
+update_expired_policies = "0 2 * * *"

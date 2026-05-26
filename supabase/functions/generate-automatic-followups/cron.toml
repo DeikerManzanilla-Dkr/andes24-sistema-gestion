@@ -1,0 +1,2 @@
+[schedule]
+cron = "0 8 * * *"  # Cada día a las 08:00 UTC
