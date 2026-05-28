@@ -224,7 +224,7 @@ export const Reports: FC = () => {
                 {filteredTransactions.map((t) => (
                   <tr key={t.id}>
                     <td className="px-6 py-4 whitespace-nowrap text-sm dark:text-gray-300">
-                      {new Date(t.date).toLocaleDateString()}
+                      {t.date.split('T')[0]}
                     </td>
                     <td className="px-6 py-4 text-sm dark:text-gray-300">
                       {t.note}

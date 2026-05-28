@@ -87,6 +87,20 @@ export const Settings: FC = () => {
     setPriceUsd(usdValue.toFixed(2));
   }, [priceEur, rates]);
 
+  // ── Auto-calculate EUR from USD using BCV rates ───────────────────────────
+  useEffect(() => {
+    if (!rates || !priceUsd.trim()) {
+      // Don't wipe EUR if USD is cleared, just skip auto-calc
+      return;
+    }
+    const usdValue = parseFloat(priceUsd);
+    if (isNaN(usdValue) || usdValue <= 0) return;
+
+    // USD → EUR using BCV rates: (USD_rate / EUR_rate)
+    const eurValue = (rates.usd / rates.eur) * usdValue;
+    setPriceEur(eurValue.toFixed(2));
+  }, [priceUsd, rates]);
+
   // ── Equivalente en Bs (read-only display) ────────────────────────────────
   const equivalenteBs = useMemo(() => {
     if (!rates || !priceEur.trim()) return null;
@@ -192,7 +206,43 @@ export const Settings: FC = () => {
 
   return (
     <div className="container mx-auto">
-      <h1 className="text-2xl font-bold mb-6 dark:text-white">Configuración</h1>
+      <style>{`
+        @media print {
+          /* Hide unnecessary elements */
+          .no-print {
+            display: none !important;
+          }
+          /* Show only the price list table */
+          .print-only {
+            display: block !important;
+          }
+          /* Hide form inputs and buttons */
+          input, button, .grid, .flex.gap-2 {
+            display: none !important;
+          }
+          /* Show only the table */
+          table {
+            display: table !important;
+          }
+          /* Hide the BCV banner */
+          .bg-gradient-to-r {
+            display: none !important;
+          }
+          /* Hide dark mode toggle */
+          .border-b:last-of-type {
+            display: none !important;
+          }
+          /* Show the list section */
+          .mt-6 {
+            display: block !important;
+          }
+          body {
+            background: white !important;
+            color: black !important;
+          }
+        }
+      `}</style>
+      <h1 className="text-2xl font-bold mb-6 dark:text-white no-print">Configuración</h1>
 
       {/* BCV Rate Banner */}
       <BcvRateBanner />
@@ -234,18 +284,27 @@ export const Settings: FC = () => {
                 <h3 className="text-lg font-medium text-gray-900 dark:text-white">Planes (RCV)</h3>
                 <p className="text-sm text-gray-500 dark:text-gray-400">Configura precios y coberturas para la emisión</p>
               </div>
-              <button
-                type="button"
-                onClick={resetForm}
-                className="px-3 py-2 text-sm rounded-lg bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600"
-              >
-                Nuevo
-              </button>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => window.print()}
+                  className="px-3 py-2 text-sm rounded-lg bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600"
+                >
+                  🖨️ Imprimir
+                </button>
+                <button
+                  type="button"
+                  onClick={resetForm}
+                  className="px-3 py-2 text-sm rounded-lg bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600"
+                >
+                  Nuevo
+                </button>
+              </div>
             </div>
 
-            {error && <div className="mb-3 text-sm text-red-600 dark:text-red-400">{error}</div>}
+            {error && <div className="mb-3 text-sm text-red-600 dark:text-red-400 no-print">{error}</div>}
 
-            <div className="grid grid-cols-1 gap-3">
+            <div className="grid grid-cols-1 gap-3 no-print">
               {/* Name */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Nombre</label>
@@ -257,11 +316,11 @@ export const Settings: FC = () => {
                 />
               </div>
 
-              {/* EUR (source of truth) + USD (auto-calculated) */}
+              {/* EUR and USD (bidirectional calculation) */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                    Costo EUR <span className="text-blue-500 text-xs">(fuente principal)</span>
+                    Costo EUR
                   </label>
                   <input
                     type="number"
@@ -273,14 +332,14 @@ export const Settings: FC = () => {
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                    Costo USD <span className="text-gray-400 text-xs">(calculado)</span>
+                    Costo USD
                   </label>
                   <input
                     type="number"
                     value={priceUsd}
                     onChange={(e) => setPriceUsd(e.target.value)}
                     placeholder="0.00"
-                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white"
+                    className="w-full px-3 py-2 border border-blue-300 dark:border-blue-600 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white"
                   />
                 </div>
               </div>
@@ -344,7 +403,8 @@ export const Settings: FC = () => {
 
             {/* Plans table */}
             <div className="mt-6">
-              <h4 className="text-sm font-medium text-gray-900 dark:text-white mb-2">Listado</h4>
+              <h4 className="text-sm font-medium text-gray-900 dark:text-white mb-2 no-print">Listado</h4>
+              <h4 className="text-lg font-bold text-gray-900 mb-4 print-only hidden">Lista de Precios - Planes RCV</h4>
               {isLoading && plans.length === 0 ? (
                 <p className="text-gray-600 dark:text-gray-400">Cargando...</p>
               ) : plans.length === 0 ? (

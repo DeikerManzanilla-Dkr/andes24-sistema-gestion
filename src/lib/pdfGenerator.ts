@@ -129,7 +129,7 @@ const ANDES24_TEMPLATE: TemplateConfig = {
         },
         {
           key: 'contract.end_date',
-          label: 'ESTE CONTRATO CADUCA EL:',
+          label: 'CADUCA EL:',
           x: 400,
           y: 585,
           fontSize: 9,
@@ -507,7 +507,7 @@ class TemplateEngine {
     page.drawLine({
       start: { x: 20 + offsetX, y: 535 + offsetY },
       end: { x: 580 + offsetX, y: 535 + offsetY },
-      thickness: 2,
+      thickness: 5,
       color: lineColor,
     });
 
@@ -515,7 +515,7 @@ class TemplateEngine {
     page.drawLine({
       start: { x: 20 + offsetX, y: 445 + offsetY },
       end: { x: 580 + offsetX, y: 445 + offsetY },
-      thickness: 2,
+      thickness: 5,
       color: lineColor,
     });
 
@@ -523,17 +523,12 @@ class TemplateEngine {
     page.drawLine({
       start: { x: 20 + offsetX, y: 215 + offsetY },
       end: { x: 580 + offsetX, y: 215 + offsetY },
-      thickness: 2,
+      thickness: 5,
       color: lineColor,
     });
   }
 
   private async renderQRCode(page: any, data: FullPdfData, pdfDoc: PDFDocument): Promise<void> {
-    if (!this.template.qrCode) return;
-
-    const offsetX = this.template.globalOffset?.x || 0;
-    const offsetY = this.template.globalOffset?.y || 0;
-
     const verifyUrl = data.contract.qr_code_url ||
       (typeof window !== 'undefined'
         ? `${window.location.origin}/verify?policy=${encodeURIComponent(data.contract.policy_number)}`
@@ -543,15 +538,7 @@ class TemplateEngine {
     if (qrBytes) {
       const qrImage = await pdfDoc.embedPng(qrBytes);
 
-      // 1. QR Grande del Contrato (Arriba)
-      page.drawImage(qrImage, {
-        x: this.template.qrCode.x + offsetX,
-        y: this.template.qrCode.y + offsetY,
-        width: this.template.qrCode.size,
-        height: this.template.qrCode.size,
-      });
-
-      // 2. QR Pequeño del Carnet (Abajo a la derecha, 55x55)
+      // QR Pequeño del Carnet (Abajo a la derecha, 55x55)
       page.drawImage(qrImage, {
         x: 480,
         y: 80,

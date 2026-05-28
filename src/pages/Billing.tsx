@@ -224,6 +224,18 @@ export const Billing: FC = () => {
         throw new Error('No se recibieron los IDs generados por la RPC');
       }
 
+      // 4.1) Actualizar la transacción financiera para incluir el método de pago en la descripción
+      const { error: updateTransactionError } = await supabase
+        .from('financial_transactions')
+        .update({
+          note: `Ingreso por póliza ${policyNumber} - Método de pago: ${paymentMethod}`
+        })
+        .eq('reference_id', saleId);
+
+      if (updateTransactionError) {
+        console.warn('⚠️ No se pudo actualizar la descripción de la transacción:', updateTransactionError.message);
+      }
+
       // 4) Recuperar el contrato completo con sus relaciones
       console.log("🔍 Recuperando datos completos del contrato...");
       const { data: contractData, error: fetchError } = await supabase
