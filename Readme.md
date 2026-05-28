@@ -146,4 +146,4 @@ Completar Archive para gestión de usuarios y monedas.
 Mejorar buscador global del Header.
 Considerar generación de PDF real con PDF-lib o similar.
 Agregar tests unitarios/integración.
-Este documento servirá como referencia mientras continuas el desarrollo y para facilitar el onboarding de nuevos desarrolladores.
+Este documento servirá como referencia mientras continuas el desarrollo y para facilitar el onboarding de nuevos desarrolladores...
