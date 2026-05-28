@@ -110,32 +110,32 @@ const ANDES24_TEMPLATE: TemplateConfig = {
         {
           key: 'contract.policy_number',
           label: 'N° DE CONTRATO:',
-          x: 400,
+          x: 350, // Ajustado para alinear con el inicio del bloque
           y: 615,
           fontSize: 12,
           font: 'bold',
           labelWidth: 100,
-          valueOffset: 115
+          valueOffset: 105 // Valor pegado a la etiqueta
         },
         {
           key: 'contract.start_date',
           label: 'INICIO:',
-          x: 400,
+          x: 350, // Misma posición X que contrato
           y: 600,
           fontSize: 9,
           font: 'bold',
-          labelWidth: 45,
-          valueOffset: 50
+          labelWidth: 50, // Ajustado para que el offset sea natural
+          valueOffset: 57 // El valor comienza justo después de la etiqueta
         },
         {
           key: 'contract.end_date',
           label: 'CADUCA EL:',
-          x: 400,
+          x: 350, // Misma posición X que contrato
           y: 585,
           fontSize: 9,
           font: 'bold',
-          labelWidth: 160,
-          valueOffset: 165
+          labelWidth: 50, // Igual que INICIO para alinear verticalmente
+          valueOffset: 57 // El valor comienza justo después de la etiqueta
         },
       ]
     },
@@ -151,7 +151,7 @@ const ANDES24_TEMPLATE: TemplateConfig = {
           fontSize: 9,
           font: 'regular',
           labelWidth: 60,
-          valueOffset: 65
+          valueOffset: 62
         },
         {
           key: 'client.document_id',
@@ -161,7 +161,7 @@ const ANDES24_TEMPLATE: TemplateConfig = {
           fontSize: 9,
           font: 'regular',
           labelWidth: 80,
-          valueOffset: 85
+          valueOffset: 82
         },
         {
           key: 'client.address',
@@ -171,7 +171,7 @@ const ANDES24_TEMPLATE: TemplateConfig = {
           fontSize: 9,
           font: 'regular',
           labelWidth: 70,
-          valueOffset: 75
+          valueOffset: 72
         },
         {
           key: 'client.phone',
@@ -181,7 +181,7 @@ const ANDES24_TEMPLATE: TemplateConfig = {
           fontSize: 9,
           font: 'regular',
           labelWidth: 60,
-          valueOffset: 65
+          valueOffset: 62
         },
         {
           key: 'client.email',
@@ -191,7 +191,7 @@ const ANDES24_TEMPLATE: TemplateConfig = {
           fontSize: 9,
           font: 'regular',
           labelWidth: 120,
-          valueOffset: 125
+          valueOffset: 122
         }
       ]
     },
@@ -207,7 +207,7 @@ const ANDES24_TEMPLATE: TemplateConfig = {
           fontSize: 9,
           font: 'regular',
           labelWidth: 50,
-          valueOffset: 52
+          valueOffset: 51
         },
         {
           key: 'vehicle.model',
@@ -217,7 +217,7 @@ const ANDES24_TEMPLATE: TemplateConfig = {
           fontSize: 9,
           font: 'regular',
           labelWidth: 55,
-          valueOffset: 57
+          valueOffset: 56
         },
         {
           key: 'vehicle.plate',
@@ -227,7 +227,7 @@ const ANDES24_TEMPLATE: TemplateConfig = {
           fontSize: 9,
           font: 'regular',
           labelWidth: 50,
-          valueOffset: 52
+          valueOffset: 51
         },
         {
           key: 'vehicle.year',
@@ -237,7 +237,7 @@ const ANDES24_TEMPLATE: TemplateConfig = {
           fontSize: 9,
           font: 'regular',
           labelWidth: 35,
-          valueOffset: 37
+          valueOffset: 36
         },
         {
           key: 'vehicle.puestos',
@@ -247,7 +247,7 @@ const ANDES24_TEMPLATE: TemplateConfig = {
           fontSize: 9,
           font: 'regular',
           labelWidth: 60,
-          valueOffset: 62
+          valueOffset: 61
         },
         {
           key: 'vehicle.tipo',
@@ -257,7 +257,7 @@ const ANDES24_TEMPLATE: TemplateConfig = {
           fontSize: 9,
           font: 'regular',
           labelWidth: 40,
-          valueOffset: 42
+          valueOffset: 41
         },
         {
           key: 'vehicle.clase',
@@ -267,7 +267,7 @@ const ANDES24_TEMPLATE: TemplateConfig = {
           fontSize: 9,
           font: 'regular',
           labelWidth: 45,
-          valueOffset: 47
+          valueOffset: 46
         },
         {
           key: 'vehicle.color',
@@ -277,7 +277,7 @@ const ANDES24_TEMPLATE: TemplateConfig = {
           fontSize: 9,
           font: 'regular',
           labelWidth: 50,
-          valueOffset: 52
+          valueOffset: 51
         },
         {
           key: 'vehicle.uso',
@@ -287,7 +287,7 @@ const ANDES24_TEMPLATE: TemplateConfig = {
           fontSize: 9,
           font: 'regular',
           labelWidth: 35,
-          valueOffset: 37
+          valueOffset: 36
         },
         {
           key: 'vehicle.serial_carroceria',
@@ -297,7 +297,7 @@ const ANDES24_TEMPLATE: TemplateConfig = {
           fontSize: 9,
           font: 'regular',
           labelWidth: 55,
-          valueOffset: 57
+          valueOffset: 56
         },
         {
           key: 'vehicle.peso',
@@ -307,7 +307,7 @@ const ANDES24_TEMPLATE: TemplateConfig = {
           fontSize: 9,
           font: 'regular',
           labelWidth: 45,
-          valueOffset: 47
+          valueOffset: 46
         },
         {
           key: 'vehicle.serial_motor',
@@ -317,7 +317,7 @@ const ANDES24_TEMPLATE: TemplateConfig = {
           fontSize: 9,
           font: 'regular',
           labelWidth: 65,
-          valueOffset: 67
+          valueOffset: 66
         }
       ]
     },
