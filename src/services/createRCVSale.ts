@@ -11,6 +11,7 @@ interface CreateRCVSaleParams {
     start_date: string;
     end_date: string;
   };
+  old_contract_id?: string;
 }
 
 interface CreateRCVSaleResponse {
@@ -36,6 +37,7 @@ export async function createRCVSale(
     p_total_amount: params.total_amount,
     p_payment_method: params.payment_method,
     p_contract_data: params.contract_data,
+    p_old_contract_id: params.old_contract_id || null,
   });
 
   if (error) {

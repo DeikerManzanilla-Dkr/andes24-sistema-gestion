@@ -501,13 +501,13 @@ class TemplateEngine {
   private async renderSeparatorLines(page: any): Promise<void> {
     const offsetX = this.template.globalOffset?.x || 0;
     const offsetY = this.template.globalOffset?.y || 0;
-    const lineColor = rgb(0.82, 0.84, 0.86); // #d1d5db
+    const lineColor = rgb(0.102, 0.451, 0.91); // Azul corporativo #1a73e8
 
     // Línea 1: Entre Cliente y Vehículo (y=535)
     page.drawLine({
       start: { x: 20 + offsetX, y: 535 + offsetY },
       end: { x: 580 + offsetX, y: 535 + offsetY },
-      thickness: 5,
+      thickness: 10,
       color: lineColor,
     });
 
@@ -515,15 +515,7 @@ class TemplateEngine {
     page.drawLine({
       start: { x: 20 + offsetX, y: 445 + offsetY },
       end: { x: 580 + offsetX, y: 445 + offsetY },
-      thickness: 5,
-      color: lineColor,
-    });
-
-    // Línea 3: Entre Coberturas y Pie de página (y=215 - más arriba de avenida josé luis faure)
-    page.drawLine({
-      start: { x: 20 + offsetX, y: 215 + offsetY },
-      end: { x: 580 + offsetX, y: 215 + offsetY },
-      thickness: 5,
+      thickness: 10,
       color: lineColor,
     });
   }

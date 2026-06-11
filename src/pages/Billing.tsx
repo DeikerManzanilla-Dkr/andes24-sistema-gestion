@@ -1,14 +1,17 @@
 import { addYears, format } from 'date-fns';
 import { FC, useEffect, useMemo, useRef, useState } from 'react';
+import { RefreshCw } from 'lucide-react';
 import { supabase } from '../lib/supabaseClient';
 import { generatePolicyPDF } from '../lib/pdfGenerator';
 import { useRealtimeSignals } from '../context/RealtimeProvider';
 import { useExchangeRates } from '../context/ExchangeRateContext';
+import { SaleSuccessOverlay } from '../components/SaleSuccessOverlay';
 
 export const Billing: FC = () => {
   const searchParams = useMemo(() => new URLSearchParams(window.location.search), []);
   const clientId = searchParams.get('clientId');
   const vehicleId = searchParams.get('vehicleId');
+  const renewingContractId = searchParams.get('renewingContractId');
   const { signals } = useRealtimeSignals();
   const { rates, isLoadingRates } = useExchangeRates();
 
@@ -48,7 +51,8 @@ export const Billing: FC = () => {
     }>
   >([]);
   const [planId, setPlanId] = useState<string>('');
-  const [paymentMethod, setPaymentMethod] = useState<string>('Efectivo');
+  const [paymentMethod, setPaymentMethod] = useState<'cash' | 'pago_movil' | 'transferencia' | 'credit'>('cash');
+  const [referenceNumber, setReferenceNumber] = useState<string>('');
 
   const [startDate, setStartDate] = useState(() => format(new Date(), 'yyyy-MM-dd'));
   const [endDate, setEndDate] = useState(() => format(addYears(new Date(), 1), 'yyyy-MM-dd'));
@@ -66,7 +70,7 @@ export const Billing: FC = () => {
   const [createdQrUrl, setCreatedQrUrl] = useState<string | null>(null);
   const [createdContractId, setCreatedContractId] = useState<string | null>(null);
 
-  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [showSuccessOverlay, setShowSuccessOverlay] = useState(false);
   const [mostrarAprobado, setMostrarAprobado] = useState(false);
   const hasOpenedPrintRef = useRef(false);
   const pdfAbortControllerRef = useRef<AbortController | null>(null);
@@ -153,11 +157,25 @@ export const Billing: FC = () => {
       setClient(clientData);
       setVehicle(vehicleData);
       await loadPlans();
+
+      // If this is a renewal, load the previous contract's plan
+      if (renewingContractId) {
+        const { data: contractData, error: contractError } = await supabase
+          .from('contracts')
+          .select('plan_id')
+          .eq('id', renewingContractId)
+          .maybeSingle();
+
+        if (!contractError && contractData && contractData.plan_id) {
+          setPlanId(contractData.plan_id);
+        }
+      }
+
       setIsLoading(false);
     };
 
     void run();
-  }, [clientId, vehicleId]);
+  }, [clientId, vehicleId, renewingContractId]);
 
   useEffect(() => {
     void loadPlans();
@@ -173,6 +191,12 @@ export const Billing: FC = () => {
     if (!planId) return;
     if (!client || !selectedPlan) return;
 
+    // Validar referencia para métodos virtuales
+    if ((paymentMethod === 'pago_movil' || paymentMethod === 'transferencia') && !referenceNumber.trim()) {
+      setError('El número de referencia es obligatorio para pagos virtuales');
+      return;
+    }
+
     setIsLoading(true);
     setError(null);
     setMostrarAprobado(false);
@@ -182,8 +206,25 @@ export const Billing: FC = () => {
       const policyNumber = generatePolicyNumber();
 
       // 2) NORMALIZACIÓN: Tu restricción CHECK de la tabla 'sales' solo acepta 'cash' o 'credit'.
-      const esCredito = paymentMethod.toLowerCase().includes('credit') || paymentMethod.toLowerCase().includes('crédito');
+      const esCredito = paymentMethod === 'credit';
       const dbPaymentMethod = esCredito ? 'credit' : 'cash';
+
+      // 3) Construir nota según método de pago
+      let note = '';
+      switch (paymentMethod) {
+        case 'cash':
+          note = 'Pago en Efectivo';
+          break;
+        case 'pago_movil':
+          note = `Pago Móvil - Ref: ${referenceNumber}`;
+          break;
+        case 'transferencia':
+          note = `Transf. Bancaria - Ref: ${referenceNumber}`;
+          break;
+        case 'credit':
+          note = 'Pago a Crédito';
+          break;
+      }
 
       // 3) Calcular monto total del plan
       const montoTotal = (selectedPlan.price_eur && selectedPlan.price_eur > 0)
@@ -209,7 +250,9 @@ export const Billing: FC = () => {
           policy_number: policyNumber,
           start_date: startDate,
           end_date: endDate
-        }
+        },
+        p_old_contract_id: renewingContractId || null,
+        p_note: note
       });
 
       if (rpcError) {
@@ -230,7 +273,7 @@ export const Billing: FC = () => {
         .update({
           note: `Ingreso por póliza ${policyNumber} - Método de pago: ${paymentMethod}`
         })
-        .eq('reference_id', saleId);
+        .eq('contract_id', contractId);
 
       if (updateTransactionError) {
         console.warn('⚠️ No se pudo actualizar la descripción de la transacción:', updateTransactionError.message);
@@ -385,10 +428,14 @@ export const Billing: FC = () => {
       setMostrarAprobado(true);
       setIsLoading(false);
 
-      // 14) Pausa visual de 3 segundos antes de mostrar el modal
+      // 14) Pausa visual de 3 segundos antes de mostrar el overlay
       setTimeout(() => {
         setMostrarAprobado(false);
-        setIsModalOpen(true);
+        setShowSuccessOverlay(true);
+        // 15) Ocultar el overlay automáticamente después de 1.5 segundos
+        setTimeout(() => {
+          setShowSuccessOverlay(false);
+        }, 1500);
       }, 3000);
 
     } catch (error: any) {
@@ -498,7 +545,15 @@ export const Billing: FC = () => {
 
   return (
     <div className="container mx-auto">
-      <h1 className="text-2xl font-bold mb-6 dark:text-white">Facturación</h1>
+      <div className="mb-6">
+        <h1 className="text-2xl font-bold dark:text-white">Facturación</h1>
+        {renewingContractId && (
+          <div className="mt-2 inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300">
+            <RefreshCw size={14} className="mr-1" />
+            Renovando contrato existente
+          </div>
+        )}
+      </div>
 
       {!clientId || !vehicleId ? (
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-6">
@@ -563,16 +618,31 @@ export const Billing: FC = () => {
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Método de Pago</label>
                   <select
                     value={paymentMethod}
-                    onChange={(e) => setPaymentMethod(e.target.value)}
+                    onChange={(e) => setPaymentMethod(e.target.value as 'cash' | 'pago_movil' | 'transferencia' | 'credit')}
                     className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white"
                   >
-                    <option value="Efectivo">Efectivo</option>
-                    <option value="Pago Móvil">Pago Móvil</option>
-                    <option value="Zelle">Zelle</option>
-                    <option value="Transferencia">Transferencia</option>
-                    <option value="Crédito">Crédito</option>
+                    <option value="cash">Efectivo</option>
+                    <option value="pago_movil">Pago Móvil</option>
+                    <option value="transferencia">Transferencia</option>
+                    <option value="credit">Crédito</option>
                   </select>
                 </div>
+
+                {(paymentMethod === 'pago_movil' || paymentMethod === 'transferencia') && (
+                  <div className="animate-in fade-in slide-in-from-top-2 duration-300">
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                      Número de Referencia <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      value={referenceNumber}
+                      onChange={(e) => setReferenceNumber(e.target.value)}
+                      placeholder="Ingrese el número de referencia"
+                      className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white"
+                      required
+                    />
+                  </div>
+                )}
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Vigencia</label>
@@ -709,50 +779,7 @@ export const Billing: FC = () => {
         </div>
       )}
 
-      {isModalOpen && createdPolicyNumber && createdContractId && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-          <div className="absolute inset-0 bg-black/40" onClick={() => setIsModalOpen(false)} />
-          <div className="relative w-full max-w-md rounded-xl bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 shadow-xl p-6">
-            <div className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
-              ¡Póliza N° {createdPolicyNumber} emitida con éxito!
-            </div>
-            <div className="text-sm text-gray-600 dark:text-gray-300 mb-4">
-              ¿Deseas imprimir el certificado ahora?
-            </div>
-
-            {error && <div className="mb-3 text-sm text-red-600 dark:text-red-400">{error}</div>}
-
-            <div className="grid grid-cols-1 gap-2">
-              <button
-                type="button"
-                onClick={handlePrintNow}
-                className="w-full px-4 py-2 text-white bg-blue-600 rounded-lg hover:bg-blue-700"
-              >
-                Ver documento
-              </button>
-              <button
-                type="button"
-                onClick={() => void downloadSavedSnapshot()}
-                className="w-full px-4 py-2 text-white bg-emerald-600 rounded-lg hover:bg-emerald-700"
-              >
-                Solo descargar
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  const url = `/documents?contractId=${encodeURIComponent(createdContractId)}`;
-                  window.history.pushState({}, '', url);
-                  window.dispatchEvent(new PopStateEvent('popstate'));
-                  setIsModalOpen(false);
-                }}
-                className="w-full px-4 py-2 text-gray-800 bg-gray-100 rounded-lg hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-200 dark:hover:bg-gray-600"
-              >
-                Cerrar
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <SaleSuccessOverlay isOpen={showSuccessOverlay} message="¡Póliza emitida con éxito!" />
     </div>
   );
 };

@@ -95,13 +95,13 @@ export const Dashboard: FC = () => {
         <div className="lg:col-span-2">
           <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700">
             <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
-              <h2 className="text-lg font-medium text-gray-900 dark:text-white">Actividad Pendiente!</h2>
+              <h2 className="text-lg font-medium text-gray-900 dark:text-white">Actividad Reciente!</h2>
             </div>
             <div className="p-6">
               {activityLoading && activities.length === 0 ? (
                 <p className="text-gray-600 dark:text-gray-400">Cargando...</p>
               ) : activities.length === 0 ? (
-                <p className="text-gray-600 dark:text-gray-400">No hay actividad reciente.</p>
+                <p className="text-gray-600 dark:text-gray-400">No hay actividad Reciente.</p>
               ) : (
                 activities.map((a) => (
                   <ActivityItem
@@ -124,7 +124,7 @@ export const Dashboard: FC = () => {
             </div>
             <div className="p-6">
               <ActionButton 
-                label="Nuevo Cliente" 
+                label="Registrar Nuevo Cliente" 
                 icon={<UserPlus size={18} />} 
                 color="blue" 
                 onClick={() => handleAction('new_client')} 

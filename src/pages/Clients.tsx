@@ -362,9 +362,9 @@ export const Clients: FC = () => {
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-1">
-          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-6">
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-210 dark:border-gray-700 p-6">
             <h2 className="text-lg font-medium text-gray-900 dark:text-white mb-4">
-              {selectedClient ? 'Editar Cliente' : 'Nuevo Cliente'}
+              {selectedClient ? 'Editar Cliente' : 'Registrar Nuevo Cliente'}
             </h2>
 
             <form onSubmit={handleCreateClient} className="space-y-4">
