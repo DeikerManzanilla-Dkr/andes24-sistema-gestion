@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { supabase } from '../lib/supabaseClient';
 import { useRealtimeSignals } from '../context/RealtimeProvider';
+import { useAuth } from '../context/AuthContext';
 
 export type DashboardStats = {
   totalClients: number;
@@ -24,6 +25,10 @@ const defaultStats: DashboardStats = {
 };
 
 export const useDashboardStats = (): UseDashboardStatsResult => {
+  const { session } = useAuth();
+  const userId = session?.user?.id;
+  const userEmail = session?.user?.email;
+
   const [stats, setStats] = useState<DashboardStats>(defaultStats);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -37,19 +42,38 @@ export const useDashboardStats = (): UseDashboardStatsResult => {
   }, []);
 
   const refresh = useCallback(async () => {
+    if (!userId) {
+      setLoading(false);
+      return;
+    }
+
     setLoading(true);
     setError(null);
 
+    const isGlobalUser = userEmail === 'proven@gmail.com';
+
+    let clientsQuery = supabase.from('clients').select('*', { count: 'exact', head: true });
+    let vehiclesQuery = supabase.from('vehicles').select('*', { count: 'exact', head: true });
+    let activeContractsQuery = supabase.from('contracts').select('*', { count: 'exact', head: true }).eq('status', 'active').gte('end_date', todayIso);
+    let renewalsQuery = supabase
+      .from('contracts')
+      .select('*', { count: 'exact', head: true })
+      .eq('status', 'active')
+      .gte('end_date', todayIso)
+      .lte('end_date', in30DaysIso);
+
+    if (!isGlobalUser) {
+      clientsQuery = clientsQuery.eq('user_id', userId);
+      vehiclesQuery = vehiclesQuery.eq('user_id', userId);
+      activeContractsQuery = activeContractsQuery.eq('user_id', userId);
+      renewalsQuery = renewalsQuery.eq('user_id', userId);
+    }
+
     const [clientsRes, vehiclesRes, activeContractsRes, renewalsRes] = await Promise.all([
-      supabase.from('clients').select('*', { count: 'exact', head: true }),
-      supabase.from('vehicles').select('*', { count: 'exact', head: true }),
-      supabase.from('contracts').select('*', { count: 'exact', head: true }).eq('status', 'active').gte('end_date', todayIso),
-      supabase
-        .from('contracts')
-        .select('*', { count: 'exact', head: true })
-        .eq('status', 'active')
-        .gte('end_date', todayIso)
-        .lte('end_date', in30DaysIso),
+      clientsQuery,
+      vehiclesQuery,
+      activeContractsQuery,
+      renewalsQuery,
     ]);
 
     const firstError = clientsRes.error ?? vehiclesRes.error ?? activeContractsRes.error ?? renewalsRes.error;
@@ -68,7 +92,7 @@ export const useDashboardStats = (): UseDashboardStatsResult => {
     });
 
     setLoading(false);
-  }, [in30DaysIso, todayIso]);
+  }, [in30DaysIso, todayIso, userId, userEmail]);
 
   useEffect(() => {
     void refresh();

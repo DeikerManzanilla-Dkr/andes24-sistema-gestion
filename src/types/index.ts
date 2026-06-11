@@ -2,6 +2,7 @@ export interface Client {
   id: string;
   name: string;
   document_id: string;
+  cedula_clean?: string | null;
   phone: string;
   vehicle_brand?: string;
   vehicle_model?: string;

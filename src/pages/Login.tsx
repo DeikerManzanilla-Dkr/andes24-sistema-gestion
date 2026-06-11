@@ -23,8 +23,11 @@ export const Login: FC = () => {
       return;
     }
 
-    // Supabase guarda la sesión automáticamente; redirigimos al dashboard
-    window.location.href = '/dashboard';
+    // Supabase guarda la sesión automáticamente; redirigimos al dashboard usando SPA
+    if (window.location.pathname !== '/dashboard') {
+      window.history.pushState({}, '', '/dashboard');
+      window.dispatchEvent(new PopStateEvent('popstate'));
+    }
   };
 
   return (

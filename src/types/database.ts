@@ -9,6 +9,7 @@ export interface ClientRow {
   id: string;
   name: string;
   document_id: string;
+  cedula_clean?: string | null;
   phone: string;
   address: string | null;
   email: string | null;

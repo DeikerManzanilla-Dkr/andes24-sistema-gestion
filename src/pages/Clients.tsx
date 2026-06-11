@@ -4,6 +4,7 @@ import { supabase } from '../lib/supabaseClient';
 import type { ClientRow } from '../types/database';
 import { SearchBar } from '../components/SearchBar';
 import { useDebounce } from '../hooks/useDebounce';
+import { normalizeCedula } from '../lib/utils';
 
 export const Clients: FC = () => {
   const [isLoading, setIsLoading] = useState(false);
@@ -43,6 +44,8 @@ export const Clients: FC = () => {
   const [email, setEmail] = useState('');
   const [birthDate, setBirthDate] = useState('');
 
+  const debouncedDocumentId = useDebounce(documentId, 500);
+
   const isValid = useMemo(() => {
     return name.trim().length >= 3 && documentId.trim().length >= 6 && phone.trim().length >= 10;
   }, [name, documentId, phone]);
@@ -53,10 +56,15 @@ export const Clients: FC = () => {
 
     let query = supabase
       .from('clients')
-      .select('id,name,document_id,phone,address,email,created_at');
+      .select('id,name,document_id,cedula_clean,phone,address,email,created_at');
 
     if (searchQuery && searchQuery.trim()) {
-      query = query.or(`name.ilike.%${searchQuery}%,document_id.ilike.%${searchQuery}%`);
+      const clean = normalizeCedula(searchQuery);
+      if (clean) {
+        query = query.or(`name.ilike.%${searchQuery}%,document_id.ilike.%${searchQuery}%,cedula_clean.eq.${clean}`);
+      } else {
+        query = query.or(`name.ilike.%${searchQuery}%,document_id.ilike.%${searchQuery}%`);
+      }
     }
 
     const { data, error: selectError } = await query.order('created_at', { ascending: false });
@@ -96,6 +104,56 @@ export const Clients: FC = () => {
   useEffect(() => {
     void loadClients(debouncedSearchTerm);
   }, [debouncedSearchTerm]);
+
+  // Real-time lookup for autocomplete and duplicates prevention
+  useEffect(() => {
+    const lookupClient = async () => {
+      const clean = normalizeCedula(debouncedDocumentId);
+      if (clean.length < 4) {
+        return;
+      }
+
+      // If we are currently editing/selecting a client whose normalized document matches, skip
+      if (selectedClient && normalizeCedula(selectedClient.document_id) === clean) {
+        return;
+      }
+
+      setIsLoading(true);
+      setError(null);
+      try {
+        const { data, error: lookupError } = await supabase
+          .from('clients')
+          .select('id,name,document_id,cedula_clean,phone,address,email,birth_date')
+          .eq('cedula_clean', clean)
+          .maybeSingle();
+
+        if (lookupError) {
+          console.error('Error looking up client:', lookupError.message);
+          return;
+        }
+
+        if (data) {
+          // Client exists in global CRM! Auto-fill all fields and set selectedClient
+          setSelectedClient(data);
+          setName(data.name);
+          setPhone(data.phone);
+          setAddress(data.address ?? '');
+          setEmail(data.email ?? '');
+          setBirthDate(data.birth_date ?? '');
+          setDocumentId(data.document_id); // Auto-fill with formatted version in DB
+          
+          // Fetch their associated vehicles
+          await loadVehicles(data.id);
+        }
+      } catch (err: any) {
+        console.error('Unexpected error in client lookup:', err);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    void lookupClient();
+  }, [debouncedDocumentId]);
 
   const resetClientForm = () => {
     setName('');
@@ -145,6 +203,7 @@ export const Clients: FC = () => {
         .update({
           name: name.trim(),
           document_id: documentId.trim(),
+          cedula_clean: normalizeCedula(documentId.trim()),
           phone: phone.trim(),
           address: address.trim(),
           email: email.trim() || null,
@@ -164,6 +223,7 @@ export const Clients: FC = () => {
         ...selectedClient,
         name: name.trim(),
         document_id: documentId.trim(),
+        cedula_clean: normalizeCedula(documentId.trim()),
         phone: phone.trim(),
         address: address.trim(),
         email: email.trim() || null,
@@ -177,6 +237,7 @@ export const Clients: FC = () => {
     const { error: insertError } = await supabase.from('clients').insert({
       name: name.trim(),
       document_id: documentId.trim(),
+      cedula_clean: normalizeCedula(documentId.trim()),
       phone: phone.trim(),
       address: address.trim(),
       email: email.trim() || null,
@@ -386,6 +447,11 @@ export const Clients: FC = () => {
                   onChange={(e) => setDocumentId(e.target.value)}
                   className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white"
                 />
+                {selectedClient && (
+                  <p className="mt-1.5 text-xs text-emerald-600 dark:text-emerald-400 flex items-center gap-1 font-medium animate-in fade-in duration-200">
+                    <span className="text-emerald-500 font-bold">✓</span> Cliente encontrado en el sistema
+                  </p>
+                )}
               </div>
 
               <div>
@@ -767,7 +833,8 @@ export const Clients: FC = () => {
                         const isSelected = (selectedClient as ClientRow | null)?.id === c.id;
                         const isMatch = debouncedSearchTerm && (
                           c.name.toLowerCase().includes(debouncedSearchTerm.toLowerCase()) ||
-                          c.document_id.toLowerCase().includes(debouncedSearchTerm.toLowerCase())
+                          c.document_id.toLowerCase().includes(debouncedSearchTerm.toLowerCase()) ||
+                          (c.cedula_clean && c.cedula_clean.includes(normalizeCedula(debouncedSearchTerm)))
                         );
                         return (
                           <tr

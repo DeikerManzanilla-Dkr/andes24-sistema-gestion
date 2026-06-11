@@ -22,8 +22,11 @@ export const AuthProvider: FC<PropsWithChildren> = ({ children }) => {
 
   const signOut = async () => {
     await supabase.auth.signOut();
-    // Redirigir a login después de cerrar sesión
-    window.location.href = '/login';
+    // Redirigir a login después de cerrar sesión usando SPA
+    if (window.location.pathname !== '/login') {
+      window.history.pushState({}, '', '/login');
+      window.dispatchEvent(new PopStateEvent('popstate'));
+    }
   };
 
   useEffect(() => {
@@ -33,10 +36,10 @@ export const AuthProvider: FC<PropsWithChildren> = ({ children }) => {
       const { data, error } = await supabase.auth.getSession();
       if (!mounted) return;
       if (error) {
+        console.error('Error getting session:', error);
         setSession(null);
         setLoading(false);
-        // Si hay error de sesión, redirigir a login
-        window.location.href = '/login';
+        // NO redirigir automáticamente en caso de error - dejar que App.tsx maneje la redirección
         return;
       }
       setSession(data.session);
@@ -47,17 +50,21 @@ export const AuthProvider: FC<PropsWithChildren> = ({ children }) => {
 
     const { data: sub } = supabase.auth.onAuthStateChange((_event, nextSession) => {
       if (!mounted) return;
+      console.log('Auth state change:', _event, nextSession ? 'session exists' : 'no session');
       setSession(nextSession);
       setLoading(false);
-      
-      // Redirecciones automáticas según estado
-      if (_event === 'SIGNED_IN' && nextSession) {
-        // Si ya está en login, redirigir al dashboard
-        if (window.location.pathname === '/login') {
-          window.location.href = '/dashboard';
+
+      // Solo redirigir en casos claros usando SPA para evitar loops
+      if (_event === 'SIGNED_OUT') {
+        if (window.location.pathname !== '/login') {
+          window.history.pushState({}, '', '/login');
+          window.dispatchEvent(new PopStateEvent('popstate'));
         }
-      } else if (_event === 'SIGNED_OUT') {
-        window.location.href = '/login';
+      } else if (_event === 'SIGNED_IN' || _event === 'INITIAL_SESSION') {
+        if (nextSession && window.location.pathname === '/login') {
+          window.history.pushState({}, '', '/dashboard');
+          window.dispatchEvent(new PopStateEvent('popstate'));
+        }
       }
     });
 

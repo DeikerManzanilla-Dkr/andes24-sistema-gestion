@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { supabase } from '../lib/supabaseClient';
 import { useRealtimeSignals } from '../context/RealtimeProvider';
+import { useAuth } from '../context/AuthContext';
 
 export type RecentActivityItem = {
   id: string;
@@ -18,20 +19,37 @@ type UseRecentActivityResult = {
 };
 
 export const useRecentActivity = (limit = 5): UseRecentActivityResult => {
+  const { session } = useAuth();
+  const userId = session?.user?.id;
+  const userEmail = session?.user?.email;
+
   const [activities, setActivities] = useState<RecentActivityItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const { signals } = useRealtimeSignals();
 
   const refresh = useCallback(async () => {
+    if (!userId) {
+      setLoading(false);
+      return;
+    }
+
     setLoading(true);
     setError(null);
 
-    const { data, error: selectError } = await supabase
+    const isGlobalUser = userEmail === 'proven@gmail.com';
+
+    let query = supabase
       .from('contracts')
       .select('id,policy_number,status,issued_at,created_at,clients(name),vehicles(plate,brand,model,year)')
       .order('created_at', { ascending: false })
       .limit(limit);
+
+    if (!isGlobalUser) {
+      query = query.eq('user_id', userId);
+    }
+
+    const { data, error: selectError } = await query;
 
     if (selectError) {
       setError(selectError.message);
@@ -64,7 +82,7 @@ export const useRecentActivity = (limit = 5): UseRecentActivityResult => {
 
     setActivities(mapped);
     setLoading(false);
-  }, [limit]);
+  }, [limit, userId, userEmail]);
 
   useEffect(() => {
     void refresh();
