@@ -17,6 +17,12 @@ export interface ClientRow {
   user_id: string | null;
   created_at: string;
   updated_at: string;
+  // Relaciones anidadas para consultas con JOIN
+  vehicles?: VehicleRow[];
+  contracts?: Array<{
+    id: string;
+    documents?: DocumentRow[];
+  }>;
 }
 
 export interface VehicleRow {
@@ -31,6 +37,9 @@ export interface VehicleRow {
   color: string | null;
   tipo_vehiculo: string | null;
   uso: string | null;
+  clase: string | null;
+  peso: string | null;
+  puestos: number | null;
   user_id: string | null;
   created_at: string;
   updated_at: string;

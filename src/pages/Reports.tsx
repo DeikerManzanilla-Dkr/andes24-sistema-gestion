@@ -1,6 +1,7 @@
 import { FC, useState, useEffect, useRef } from 'react';
 import { startOfDay, endOfDay, format } from 'date-fns';
 import { useTheme } from '../context/ThemeContext';
+import { useAuth } from '../context/AuthContext';
 import { supabase } from '../lib/supabaseClient';
 import {
   BarChart3,
@@ -24,15 +25,16 @@ interface Transaction {
 
 export const Reports: FC = () => {
   const { isDarkMode: darkMode } = useTheme();
+  const { session } = useAuth();
   const [loading, setLoading] = useState(true);
-  
+
   // Inicializar fechas con el día de hoy (startOfDay y endOfDay)
   const today = new Date();
   const [dateRange, setDateRange] = useState({
     start: format(startOfDay(today), 'yyyy-MM-dd'),
     end: format(endOfDay(today), 'yyyy-MM-dd')
   });
-  
+
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [selectedType, setSelectedType] = useState('all');
   const [showExpenseModal, setShowExpenseModal] = useState(false);
@@ -40,7 +42,7 @@ export const Reports: FC = () => {
   const [isSavingExpense, setIsSavingExpense] = useState(false);
   const reportRef = useRef<HTMLDivElement>(null);
 
-  // 1. Cargar datos desde la tabla unificada de transacciones
+  // 1. Cargar datos desde la tabla unificada de transacciones filtrados por usuario
   const fetchReportData = async () => {
     setLoading(true);
     try {
@@ -48,6 +50,11 @@ export const Reports: FC = () => {
         .from('financial_transactions')
         .select('*')
         .order('created_at', { ascending: false });
+
+      // Filtrar por usuario actual
+      if (session?.user?.id) {
+        query = query.eq('user_id', session.user.id);
+      }
 
       if (dateRange.start) query = query.gte('created_at', dateRange.start);
       if (dateRange.end) query = query.lte('created_at', dateRange.end + 'T23:59:59');
@@ -75,13 +82,14 @@ export const Reports: FC = () => {
   const handleCreateExpense = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!expenseForm.amount) return;
-    
+
     setIsSavingExpense(true);
     const { error } = await supabase.from('financial_transactions').insert({
       type: 'expense',
       amount: Number(expenseForm.amount),
       note: expenseForm.note,
-      category: 'Gasto Administrativo'
+      category: 'Gasto Administrativo',
+      user_id: session?.user?.id
     });
 
     if (error) {
@@ -96,7 +104,7 @@ export const Reports: FC = () => {
 
   useEffect(() => {
     fetchReportData();
-  }, [dateRange]);
+  }, [dateRange, session?.user?.id]);
 
   // 2. Lógica de Filtros
   const filteredTransactions = transactions.filter(t => {

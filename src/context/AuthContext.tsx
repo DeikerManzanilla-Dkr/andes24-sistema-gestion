@@ -21,11 +21,33 @@ export const AuthProvider: FC<PropsWithChildren> = ({ children }) => {
   const [loading, setLoading] = useState(true);
 
   const signOut = async () => {
-    await supabase.auth.signOut();
-    // Redirigir a login después de cerrar sesión usando SPA
-    if (window.location.pathname !== '/login') {
-      window.history.pushState({}, '', '/login');
-      window.dispatchEvent(new PopStateEvent('popstate'));
+    try {
+      // 1. Intentamos cerrar la sesión en el servidor de Supabase
+      const { error } = await supabase.auth.signOut();
+
+      // Si hay error (como el 403 session_not_found), lo registramos pero NO detenemos la ejecución
+      if (error) {
+        console.warn("Aviso de Supabase al cerrar sesión (ignorable):", error.message);
+      }
+    } catch (err) {
+      console.error("Error inesperado ejecutando el logout:", err);
+    } finally {
+      // 2. LO MÁS IMPORTANTE: Forzamos la limpieza local pase lo que pase
+
+      // Limpiamos los tokens cacheados por Supabase en el Local Storage
+      for (const key in localStorage) {
+        if (key.startsWith('sb-') && key.endsWith('-auth-token')) {
+          localStorage.removeItem(key);
+        }
+      }
+
+      // 3. Limpiamos el estado local
+      setSession(null);
+
+      // 4. Redirigimos al usuario a la pantalla de login de inmediato
+      if (window.location.pathname !== '/login') {
+        window.location.href = '/login';
+      }
     }
   };
 

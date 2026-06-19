@@ -44,8 +44,6 @@ export const Clients: FC = () => {
   const [email, setEmail] = useState('');
   const [birthDate, setBirthDate] = useState('');
 
-  const debouncedDocumentId = useDebounce(documentId, 500);
-
   const isValid = useMemo(() => {
     return name.trim().length >= 3 && documentId.trim().length >= 6 && phone.trim().length >= 10;
   }, [name, documentId, phone]);
@@ -105,55 +103,70 @@ export const Clients: FC = () => {
     void loadClients(debouncedSearchTerm);
   }, [debouncedSearchTerm]);
 
-  // Real-time lookup for autocomplete and duplicates prevention
-  useEffect(() => {
-    const lookupClient = async () => {
-      const clean = normalizeCedula(debouncedDocumentId);
-      if (clean.length < 4) {
-        return;
-      }
+  // Función para buscar cliente por cédula (se dispara en onBlur y Enter)
+  const handleCedulaLookup = async () => {
+    const clean = normalizeCedula(documentId);
+    if (clean.length < 4) {
+      return;
+    }
 
-      // If we are currently editing/selecting a client whose normalized document matches, skip
-      if (selectedClient && normalizeCedula(selectedClient.document_id) === clean) {
-        return;
-      }
+    // If we are currently editing/selecting a client whose normalized document matches, skip
+    if (selectedClient && normalizeCedula(selectedClient.document_id) === clean) {
+      return;
+    }
 
-      setIsLoading(true);
-      setError(null);
-      try {
-        const { data, error: lookupError } = await supabase
-          .from('clients')
-          .select('id,name,document_id,cedula_clean,phone,address,email,birth_date')
-          .eq('cedula_clean', clean)
-          .maybeSingle();
+    setIsLoading(true);
+    setError(null);
+    try {
+      const { data, error: lookupError } = await supabase
+        .from('clients')
+        .select('id,name,document_id,cedula_clean,phone,address,email,birth_date,vehicles(*),contracts(id,documents(*))')
+        .eq('cedula_clean', clean)
+        .maybeSingle();
 
-        if (lookupError) {
+      if (lookupError) {
+        // Manejo silencioso de errores cuando no hay resultados (PGRST116)
+        if (lookupError.code !== 'PGRST116') {
           console.error('Error looking up client:', lookupError.message);
-          return;
         }
-
-        if (data) {
-          // Client exists in global CRM! Auto-fill all fields and set selectedClient
-          setSelectedClient(data);
-          setName(data.name);
-          setPhone(data.phone);
-          setAddress(data.address ?? '');
-          setEmail(data.email ?? '');
-          setBirthDate(data.birth_date ?? '');
-          setDocumentId(data.document_id); // Auto-fill with formatted version in DB
-          
-          // Fetch their associated vehicles
-          await loadVehicles(data.id);
-        }
-      } catch (err: any) {
-        console.error('Unexpected error in client lookup:', err);
-      } finally {
-        setIsLoading(false);
+        return;
       }
-    };
 
-    void lookupClient();
-  }, [debouncedDocumentId]);
+      if (data) {
+        // Client exists in global CRM! Auto-fill all fields and set selectedClient
+        const clientData = data as ClientRow;
+        setSelectedClient(clientData);
+        setName(clientData.name);
+        setPhone(clientData.phone);
+        setAddress(clientData.address ?? '');
+        setEmail(clientData.email ?? '');
+        setBirthDate(clientData.birth_date ?? '');
+        setDocumentId(clientData.document_id); // Auto-fill with formatted version in DB
+
+        // Load vehicles from nested data or fetch separately
+        if (clientData.vehicles && clientData.vehicles.length > 0) {
+          setVehicles(clientData.vehicles);
+        } else {
+          await loadVehicles(clientData.id);
+        }
+      }
+    } catch (err: any) {
+      console.error('Unexpected error in client lookup:', err);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleCedulaBlur = () => {
+    void handleCedulaLookup();
+  };
+
+  const handleCedulaKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      void handleCedulaLookup();
+    }
+  };
 
   const resetClientForm = () => {
     setName('');
@@ -430,6 +443,24 @@ export const Clients: FC = () => {
 
             <form onSubmit={handleCreateClient} className="space-y-4">
               <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">C.I / RIF</label>
+                <input
+                  type="text"
+                  value={documentId}
+                  onChange={(e) => setDocumentId(e.target.value)}
+                  onBlur={handleCedulaBlur}
+                  onKeyDown={handleCedulaKeyDown}
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white"
+                  placeholder="Ingrese cédula y presione Enter o salga del campo para buscar..."
+                />
+                {selectedClient && (
+                  <p className="mt-1.5 text-xs text-emerald-600 dark:text-emerald-400 flex items-center gap-1 font-medium animate-in fade-in duration-200">
+                    <span className="text-emerald-500 font-bold">✓</span> Cliente encontrado en el sistema
+                  </p>
+                )}
+              </div>
+
+              <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Nombre y Apellido</label>
                 <input
                   type="text"
@@ -437,21 +468,6 @@ export const Clients: FC = () => {
                   onChange={(e) => setName(e.target.value)}
                   className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white"
                 />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">C.I / RIF</label>
-                <input
-                  type="text"
-                  value={documentId}
-                  onChange={(e) => setDocumentId(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white"
-                />
-                {selectedClient && (
-                  <p className="mt-1.5 text-xs text-emerald-600 dark:text-emerald-400 flex items-center gap-1 font-medium animate-in fade-in duration-200">
-                    <span className="text-emerald-500 font-bold">✓</span> Cliente encontrado en el sistema
-                  </p>
-                )}
               </div>
 
               <div>
