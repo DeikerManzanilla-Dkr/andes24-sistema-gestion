@@ -11,6 +11,7 @@ import { Settings } from './pages/Settings';
 import { Verify } from './pages/Verify';
 import { Verification } from './pages/Verification';
 import { CRM } from './pages/CRM';
+import { CreateInvoice } from './pages/CreateInvoice';
 import { Login } from './pages/Login';
 import { ThemeProvider } from './context/ThemeContext';
 import { RealtimeProvider } from './context/RealtimeProvider';
@@ -45,6 +46,8 @@ function App() {
         return 'reports';
       case '/settings':
         return 'settings';
+      case '/create-invoice':
+        return 'create-invoice';
       case '/verify':
         return 'verify';
       default:
@@ -101,6 +104,8 @@ function App() {
         return <Reports />;
       case 'settings':
         return <Settings />;
+      case 'create-invoice':
+        return <CreateInvoice />;
       case 'verify':
         return <Verify />;
       case 'verification':

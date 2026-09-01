@@ -158,6 +158,7 @@ export const Reports: FC = () => {
 
           <input
             type="date"
+            value={dateRange.start}
             className={`px-3 py-2 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none transition-all ${
               darkMode ? 'bg-gray-800 border-gray-700 text-white' : 'bg-white border-gray-200 text-gray-700'
             }`}
@@ -165,6 +166,7 @@ export const Reports: FC = () => {
           />
           <input
             type="date"
+            value={dateRange.end}
             className={`px-3 py-2 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none transition-all ${
               darkMode ? 'bg-gray-800 border-gray-700 text-white' : 'bg-white border-gray-200 text-gray-700'
             }`}

@@ -8,7 +8,8 @@ import {
   BarChart, 
   Settings,
   Phone,
-  X
+  X,
+  Receipt
 } from 'lucide-react';
 import { useTheme } from '../context/ThemeContext';
 
@@ -115,6 +116,13 @@ export const Sidebar: FC<SidebarProps> = ({ currentPage, setCurrentPage, isOpen 
             page="billing" 
             currentPage={currentPage} 
             onClick={() => setCurrentPage('billing')} 
+          />
+          <NavItem 
+            icon={<Receipt size={18} />} 
+            label="Crear Factura" 
+            page="create-invoice" 
+            currentPage={currentPage} 
+            onClick={() => setCurrentPage('create-invoice')} 
           />
           <NavItem 
             icon={<FileSignature size={18} />} 

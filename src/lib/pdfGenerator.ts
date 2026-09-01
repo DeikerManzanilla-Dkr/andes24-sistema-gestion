@@ -41,6 +41,33 @@ export interface FullPdfData {
   overlays?: Array<{ text: string; x: number; y: number; fontSize?: number }>;
 }
 
+export interface InvoicePdfData {
+  invoice: {
+    id: string;
+    invoice_number: string;
+    subtotal: number;
+    tax: number;
+    total_amount: number;
+    status: string;
+    created_at: string;
+  };
+  client: {
+    id: string;
+    name: string;
+    document_id: string;
+    phone: string;
+    email: string | null;
+    address: string | null;
+  };
+  items: Array<{
+    invoice_id: string;
+    description: string;
+    quantity: number;
+    unit_price: number;
+    total_price: number;
+  }>;
+}
+
 export type PdfOverlayElement = {
   id: string;
   type: 'text';
@@ -693,6 +720,289 @@ export async function generatePolicyPDF({
   };
 
   return await generateAndes24Policy(data, abortSignal);
+}
+
+export async function generateInvoicePDF({
+  invoice,
+  client,
+  items,
+  abortSignal,
+  exchangeRate,
+}: {
+  invoice: InvoicePdfData['invoice'];
+  client: InvoicePdfData['client'];
+  items: InvoicePdfData['items'];
+  abortSignal?: AbortSignal;
+  exchangeRate?: number;
+}): Promise<Uint8Array> {
+  if (abortSignal?.aborted) throw new Error('AbortError');
+
+  // Tasa de cambio por defecto si no se proporciona
+  const usdToBs = exchangeRate || 36.5;
+
+  // Crear un nuevo documento PDF
+  const pdfDoc = await PDFDocument.create();
+  const page = pdfDoc.addPage([595, 842]); // A4 size
+  const { width, height } = page.getSize();
+
+  // Embed fonts
+  const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
+  const boldFont = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
+
+  // Colores
+  const primaryColor = rgb(0.13, 0.27, 0.42); // Dark blue
+  const secondaryColor = rgb(0.6, 0.67, 0.73); // Light gray
+  const textColor = rgb(0.2, 0.2, 0.2); // Dark gray
+
+  let yPosition = height - 50;
+
+  // Header
+  page.drawText('ANDES 24', {
+    x: 50,
+    y: yPosition,
+    size: 24,
+    font: boldFont,
+    color: primaryColor,
+  });
+
+  page.drawText('Factura de Servicios', {
+    x: 50,
+    y: yPosition - 30,
+    size: 16,
+    font: font,
+    color: textColor,
+  });
+
+  page.drawText(`Factura #${invoice.invoice_number}`, {
+    x: width - 200,
+    y: yPosition,
+    size: 14,
+    font: boldFont,
+    color: primaryColor,
+  });
+
+  page.drawText(`Fecha: ${new Date(invoice.created_at).toLocaleDateString('es-VE')}`, {
+    x: width - 200,
+    y: yPosition - 20,
+    size: 10,
+    font: font,
+    color: textColor,
+  });
+
+  yPosition -= 80;
+
+  // Cliente info
+  page.drawText('Cliente:', {
+    x: 50,
+    y: yPosition,
+    size: 12,
+    font: boldFont,
+    color: primaryColor,
+  });
+
+  page.drawText(client.name, {
+    x: 50,
+    y: yPosition - 20,
+    size: 11,
+    font: font,
+    color: textColor,
+  });
+
+  page.drawText(`C.I/RIF: ${client.document_id}`, {
+    x: 50,
+    y: yPosition - 35,
+    size: 10,
+    font: font,
+    color: textColor,
+  });
+
+  page.drawText(`Teléfono: ${client.phone}`, {
+    x: 50,
+    y: yPosition - 50,
+    size: 10,
+    font: font,
+    color: textColor,
+  });
+
+  if (client.email) {
+    page.drawText(`Email: ${client.email}`, {
+      x: 50,
+      y: yPosition - 65,
+      size: 10,
+      font: font,
+      color: textColor,
+    });
+  }
+
+  yPosition -= 100;
+
+  // Table header
+  page.drawRectangle({
+    x: 50,
+    y: yPosition,
+    width: width - 100,
+    height: 25,
+    color: primaryColor,
+  });
+
+  page.drawText('Descripción', {
+    x: 55,
+    y: yPosition + 8,
+    size: 10,
+    font: boldFont,
+    color: rgb(1, 1, 1),
+  });
+
+  page.drawText('Cantidad', {
+    x: 300,
+    y: yPosition + 8,
+    size: 10,
+    font: boldFont,
+    color: rgb(1, 1, 1),
+  });
+
+  page.drawText('Precio Unit.', {
+    x: 380,
+    y: yPosition + 8,
+    size: 10,
+    font: boldFont,
+    color: rgb(1, 1, 1),
+  });
+
+  page.drawText('Total', {
+    x: 500,
+    y: yPosition + 8,
+    size: 10,
+    font: boldFont,
+    color: rgb(1, 1, 1),
+  });
+
+  yPosition -= 30;
+
+  // Items
+  for (const item of items) {
+    page.drawText(item.description, {
+      x: 55,
+      y: yPosition,
+      size: 9,
+      font: font,
+      color: textColor,
+    });
+
+    page.drawText(item.quantity.toString(), {
+      x: 300,
+      y: yPosition,
+      size: 9,
+      font: font,
+      color: textColor,
+    });
+
+    const unitPrice = `$${item.unit_price.toFixed(2)}`;
+    page.drawText(unitPrice, {
+      x: 380,
+      y: yPosition,
+      size: 9,
+      font: font,
+      color: textColor,
+    });
+
+    const totalPrice = `$${item.total_price.toFixed(2)}`;
+    page.drawText(totalPrice, {
+      x: 500,
+      y: yPosition,
+      size: 9,
+      font: font,
+      color: textColor,
+    });
+
+    yPosition -= 20;
+  }
+
+  yPosition -= 20;
+
+  // Totals
+  page.drawLine({
+    start: { x: 50, y: yPosition },
+    end: { x: width - 50, y: yPosition },
+    thickness: 1,
+    color: textColor,
+  });
+
+  yPosition -= 30;
+
+  // Subtotal (igual al total sin IVA)
+  page.drawText('Subtotal:', {
+    x: width - 200,
+    y: yPosition,
+    size: 11,
+    font: font,
+    color: textColor,
+  });
+
+  page.drawText(`$${invoice.subtotal.toFixed(2)}`, {
+    x: width - 80,
+    y: yPosition,
+    size: 11,
+    font: font,
+    color: textColor,
+  });
+
+  const subtotalBs = invoice.subtotal * usdToBs;
+  page.drawText(`Bs. ${subtotalBs.toFixed(0)}`, {
+    x: width - 80,
+    y: yPosition - 12,
+    size: 9,
+    font: font,
+    color: secondaryColor,
+  });
+
+  yPosition -= 35;
+
+  // Total (sin IVA) - Sin fondo azul, texto en negro
+  page.drawText('TOTAL:', {
+    x: width - 200,
+    y: yPosition + 10,
+    size: 12,
+    font: boldFont,
+    color: textColor,
+  });
+
+  page.drawText(`$${invoice.total_amount.toFixed(2)}`, {
+    x: width - 80,
+    y: yPosition + 10,
+    size: 12,
+    font: boldFont,
+    color: textColor,
+  });
+
+  const totalBs = invoice.total_amount * usdToBs;
+  page.drawText(`Bs. ${totalBs.toFixed(0)}`, {
+    x: width - 80,
+    y: yPosition - 2,
+    size: 10,
+    font: boldFont,
+    color: textColor,
+  });
+
+  // Footer
+  page.drawText('Gracias por su preferencia', {
+    x: width / 2 - 60,
+    y: 50,
+    size: 10,
+    font: font,
+    color: secondaryColor,
+  });
+
+  page.drawText('ANDES 24 - Sistema de Gestión', {
+    x: width / 2 - 70,
+    y: 35,
+    size: 8,
+    font: font,
+    color: secondaryColor,
+  });
+
+  const pdfBytes = await pdfDoc.save();
+  return pdfBytes;
 }
 
 // Exportar para uso en otros componentes
