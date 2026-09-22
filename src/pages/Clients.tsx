@@ -1,10 +1,11 @@
-import { FC, useEffect, useMemo, useState, type FormEvent } from 'react';
-import { Pencil } from 'lucide-react';
+import { FC, useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
+import { Pencil, Camera, Loader2 } from 'lucide-react';
 import { supabase } from '../lib/supabaseClient';
 import type { ClientRow } from '../types/database';
 import { SearchBar } from '../components/SearchBar';
 import { useDebounce } from '../hooks/useDebounce';
 import { normalizeCedula } from '../lib/utils';
+import { scanVehicleDocument, getHighlightedFields, type OcrVehicleData } from '../lib/ocrParser';
 
 export const Clients: FC = () => {
   const [isLoading, setIsLoading] = useState(false);
@@ -33,6 +34,10 @@ export const Clients: FC = () => {
   const [vehicleUso, setVehicleUso] = useState('');
   const [vehiclePeso, setVehiclePeso] = useState('');
   const [vehiclePuestos, setVehiclePuestos] = useState<string>('');
+
+  const [isScanning, setIsScanning] = useState(false);
+  const [ocrHighlightedFields, setOcrHighlightedFields] = useState<string[]>([]);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [editingVehicle, setEditingVehicle] = useState<typeof vehicles[0] | null>(null);
   const [isEditingVehicleOpen, setIsEditingVehicleOpen] = useState(false);
@@ -428,6 +433,47 @@ export const Clients: FC = () => {
     setVehiclePuestos('');
     setEditingVehicle(null);
     setIsEditingVehicleOpen(false);
+    setOcrHighlightedFields([]);
+  };
+
+  const handleScanVehicleDocument = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setIsScanning(true);
+    setOcrHighlightedFields([]);
+
+    try {
+      const ocrData: OcrVehicleData = await scanVehicleDocument(file);
+      const highlightedFields = getHighlightedFields(ocrData);
+
+      if (ocrData.plate) setVehiclePlate(ocrData.plate);
+      if (ocrData.serialCarroceria) setVehicleSerialCarroceria(ocrData.serialCarroceria);
+      if (ocrData.year) setVehicleYear(String(ocrData.year));
+      if (ocrData.brand) setVehicleBrand(ocrData.brand);
+      if (ocrData.model) setVehicleModel(ocrData.model);
+      if (ocrData.color) setVehicleColor(ocrData.color);
+      if (ocrData.tipoVehiculo) setVehicleTipoVehiculo(ocrData.tipoVehiculo);
+      if (ocrData.uso) setVehicleUso(ocrData.uso);
+
+      setOcrHighlightedFields(highlightedFields);
+    } catch (err) {
+      console.error('Error en OCR:', err);
+      setVehicleError('Error al procesar la imagen. Intente nuevamente.');
+    } finally {
+      setIsScanning(false);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+    }
+  };
+
+  const getOcrInputClass = (fieldName: string): string => {
+    const baseClass = 'w-full px-3 py-2 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white';
+    if (ocrHighlightedFields.includes(fieldName)) {
+      return `${baseClass} border-emerald-500 bg-emerald-50 dark:bg-emerald-900/20`;
+    }
+    return `${baseClass} border-gray-300 dark:border-gray-600`;
   };
 
   return (
@@ -554,19 +600,45 @@ export const Clients: FC = () => {
               <h2 className="text-lg font-medium text-gray-900 dark:text-white">
                 {selectedClient ? `Vehículos de ${selectedClient.name}` : 'Listado'}
               </h2>
-              <button
-                type="button"
-                onClick={() => {
-                  if (selectedClient) {
-                    void loadVehicles(selectedClient.id);
-                  } else {
-                    void loadClients();
-                  }
-                }}
-                className="px-3 py-2 text-sm rounded-lg bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200"
-              >
-                Actualizar
-              </button>
+              <div className="flex items-center gap-2">
+                <input
+                  type="file"
+                  accept="image/*"
+                  capture="environment"
+                  ref={fileInputRef}
+                  onChange={handleScanVehicleDocument}
+                  disabled={isScanning}
+                  className="hidden"
+                  id="vehicle-scan-input"
+                />
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={isScanning || !selectedClient}
+                  className="p-2 rounded-lg bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                  title="Escanear Carnet de Circulación / Título de Propiedad"
+                  aria-label="Escanear documento del vehículo"
+                >
+                  {isScanning ? (
+                    <Loader2 className="w-5 h-5 animate-spin text-blue-600" />
+                  ) : (
+                    <Camera className="w-5 h-5" />
+                  )}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (selectedClient) {
+                      void loadVehicles(selectedClient.id);
+                    } else {
+                      void loadClients();
+                    }
+                  }}
+                  className="px-3 py-2 text-sm rounded-lg bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200"
+                >
+                  Actualizar
+                </button>
+              </div>
             </div>
 
             {!selectedClient && (
@@ -611,7 +683,7 @@ export const Clients: FC = () => {
                         onChange={(e) => setVehiclePlate(e.target.value.toUpperCase())}
                         maxLength={12}
                         placeholder="Ej: ABC123"
-                        className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white"
+                        className={getOcrInputClass('plate')}
                       />
                     </div>
                     <div>
@@ -620,7 +692,7 @@ export const Clients: FC = () => {
                         type="text"
                         value={vehicleBrand}
                         onChange={(e) => setVehicleBrand(e.target.value)}
-                        className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white"
+                        className={getOcrInputClass('brand')}
                       />
                     </div>
                     <div>
@@ -629,7 +701,7 @@ export const Clients: FC = () => {
                         type="text"
                         value={vehicleModel}
                         onChange={(e) => setVehicleModel(e.target.value)}
-                        className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white"
+                        className={getOcrInputClass('model')}
                       />
                     </div>
 
@@ -641,7 +713,7 @@ export const Clients: FC = () => {
                         value={vehicleYear}
                         onChange={(e) => setVehicleYear(e.target.value)}
                         min={1900} max={2100}
-                        className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white"
+                        className={getOcrInputClass('year')}
                       />
                     </div>
                     <div>
@@ -650,7 +722,7 @@ export const Clients: FC = () => {
                         type="text"
                         value={vehicleColor}
                         onChange={(e) => setVehicleColor(e.target.value)}
-                        className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white"
+                        className={getOcrInputClass('color')}
                       />
                     </div>
                     <div>
@@ -674,7 +746,7 @@ export const Clients: FC = () => {
                         value={vehicleTipoVehiculo}
                         onChange={(e) => setVehicleTipoVehiculo(e.target.value)}
                         placeholder="Sedán, Pick-up, etc"
-                        className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white"
+                        className={getOcrInputClass('tipoVehiculo')}
                       />
                     </div>
                     <div>
@@ -685,7 +757,7 @@ export const Clients: FC = () => {
                         value={vehicleUso}
                         onChange={(e) => setVehicleUso(e.target.value)}
                         placeholder="Carga, Particular, ..."
-                        className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white"
+                        className={getOcrInputClass('uso')}
                       />
                     </div>
                     <div>
@@ -726,7 +798,7 @@ export const Clients: FC = () => {
                         type="text"
                         value={vehicleSerialCarroceria}
                         onChange={(e) => setVehicleSerialCarroceria(e.target.value)}
-                        className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white"
+                        className={getOcrInputClass('serialCarroceria')}
                       />
                     </div>
 
@@ -910,7 +982,7 @@ export const Clients: FC = () => {
                   value={vehiclePlate}
                   onChange={(e) => setVehiclePlate(e.target.value.toUpperCase())}
                   maxLength={12}
-                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white"
+                  className={getOcrInputClass('plate')}
                 />
               </div>
               <div>
@@ -919,7 +991,7 @@ export const Clients: FC = () => {
                   type="text"
                   value={vehicleBrand}
                   onChange={(e) => setVehicleBrand(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white"
+                  className={getOcrInputClass('brand')}
                 />
               </div>
               <div>
@@ -928,7 +1000,7 @@ export const Clients: FC = () => {
                   type="text"
                   value={vehicleModel}
                   onChange={(e) => setVehicleModel(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white"
+                  className={getOcrInputClass('model')}
                 />
               </div>
 
@@ -939,7 +1011,7 @@ export const Clients: FC = () => {
                   value={vehicleYear}
                   onChange={(e) => setVehicleYear(e.target.value)}
                   min={1900} max={2100}
-                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white"
+                  className={getOcrInputClass('year')}
                 />
               </div>
               <div>
@@ -948,7 +1020,7 @@ export const Clients: FC = () => {
                   type="text"
                   value={vehicleColor}
                   onChange={(e) => setVehicleColor(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white"
+                  className={getOcrInputClass('color')}
                 />
               </div>
               <div>
@@ -969,7 +1041,7 @@ export const Clients: FC = () => {
                   list="tipo-options"
                   value={vehicleTipoVehiculo}
                   onChange={(e) => setVehicleTipoVehiculo(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white"
+                  className={getOcrInputClass('tipoVehiculo')}
                 />
               </div>
 
@@ -980,7 +1052,7 @@ export const Clients: FC = () => {
                   list="uso-options"
                   value={vehicleUso}
                   onChange={(e) => setVehicleUso(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white"
+                  className={getOcrInputClass('uso')}
                 />
               </div>
               <div>
@@ -1019,7 +1091,7 @@ export const Clients: FC = () => {
                   type="text"
                   value={vehicleSerialCarroceria}
                   onChange={(e) => setVehicleSerialCarroceria(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white"
+                  className={getOcrInputClass('serialCarroceria')}
                 />
               </div>
 
